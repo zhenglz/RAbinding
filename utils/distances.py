@@ -31,7 +31,12 @@ def distance_pairs_mdtraj(coord_pro, coord_lig):
 
 
 def residue_min_distance(coord_pro, coord_lig, residue_names, receptor_elements, ligand_elements):
-    uniq_res = sorted(list(set(residue_names)))
+    # combine same residues in the residue_names list
+    uniq_res = []
+    for _residue in residue_names:
+        if _residue not in uniq_res:
+            uniq_res.append(_residue)
+
     assert coord_pro.shape[0] == len(residue_names)
     assert coord_pro.shape[0] == len(receptor_elements)
     assert coord_lig.shape[0] == len(ligand_elements)

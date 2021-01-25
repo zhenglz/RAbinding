@@ -1,0 +1,127 @@
+#!/usr/bin/ python 3.X
+
+import numpy as np
+import pandas as pd
+from argparse import RawDescriptionHelpFormatter
+import argparse
+import mdtraj as md
+import itertools
+from collections import OrderedDict
+from utils.atomtype import *
+from utils.receptor import ProteinParser
+from utils.ligand import LigandParser
+from utils.distances import residue_min_distance
+from utils.contacts import dist2count_simple
+
+
+# all residue-atom combination pairs
+keys = ["_".join(x) for x in list(itertools.product(all_residues, all_elements))]
+
+
+def generate_features(receptor_file, ligand_file, cutoffs):
+    # process ligand
+    ligand = LigandParser(ligand_file)
+    ligand.parseMol2()
+
+    # process receptor
+    receptor = ProteinParser(receptor_file)
+    receptor.parsePDB()
+
+    # get receptor information
+    _residue_names = receptor.residue_names
+    _residue_elements = receptor.rec_ele
+    _residue_coordinates = receptor.coordinates_
+
+    # get ligand information
+    _ligand_elements = ligand.lig_ele
+    _ligand_coordinates = ligand.coordinates_
+
+    # get mini distances
+    _min_distances, _residues, _non_hydrogen_elements = residue_min_distance(_residue_coordinates, _ligand_coordinates, 
+                                                                      _residue_names, _residue_elements, _ligand_elements)
+
+    # 
+
+    # Types of the residue and the atom 
+    #new_residue = list(map(get_residue, cplx.residues))
+    new_residue = [x.split("_")[0] for x in _residues]
+    new_lig = list(map(get_elementtype, _non_hydrogen_elements))
+
+    # residue-atom pairs
+    residues_lig_atoms_combines = ["_".join(x) for x in list(itertools.product(new_residue, new_lig))]
+
+    # calculate the number of contacts in different shells
+    counts = []
+    onion_counts = []
+    final_results = OrderedDict()
+
+    for i, cutoff in enumerate(cutoffs):
+        counts_ = dist2count_simple(_min_distances, cutoff)
+        if i == 0:
+            onion_counts.append(counts_)
+        else:
+            onion_counts.append(counts_ - counts[-1])
+
+        for j, _key in enumerate(residues_lig_atoms_combines):
+            _new_key = _key + "_" + str(i)
+            if _new_key not in final_results.keys():
+                final_results[_new_key] = counts_.reval()[j]
+            else:
+                final_results[_new_key] += counts_.reval()[j]
+
+    return list(final_results.values())
+
+
+if __name__ == "__main__":
+
+    print("Start Now ... ")
+
+    d = """
+        Generate the residue-atom contact features.
+
+        The distance calculated in this script is the minimum distance between residues and atoms,\n
+        that is, the distance between the atom (in the ligand) and the closest heavy atom in the specific residue.
+
+        usage:
+            python generate_features.py -inp input_complex.dat -out output_features.csv
+        """
+
+    parser = argparse.ArgumentParser(description=d, formatter_class=RawDescriptionHelpFormatter)
+    parser.add_argument("-inp", type=str, default="input_complex.dat",
+                        help="Input. This file includes the path of the pdb file \n"
+                             "for the protein-ligand complexes. \n"
+                             "Each line in the dat file contains only one pdb file path.")
+    parser.add_argument("-out", type=str, default="output_features.csv",
+                        help="Output. The output file format is .csv \n"
+                             "Each line in the output file contains only the features \n"
+                             "of one protein-ligand complex.")
+    parser.add_argument("-shells", type=int, default=62,
+                        help="Input. The total number of shells. The optional range here \n"
+                             "is 10 <= N <= 90.")
+
+    args = parser.parse_args()
+
+    with open(args.inp) as lines:
+        inputs = [x[:2] for x in lines if ("#" not in x and len(x))]
+
+    results = []
+    index = []
+
+    outermost = 0.05 * (args.shells + 1)
+    ncutoffs = np.linspace(0.1, outermost, args.shells)
+
+    l = len(inputs)
+    for i, fns in enumerate(inputs):
+        rec, lig = fns
+        result = generate_features(fn, ncutoffs)
+        results.append(result)
+        index.append(fn)
+        print(result, i, l)
+
+    columns = []
+    for i, n in enumerate(keys * len(ncutoffs)):
+        columns.append(n + '_' + str(i))
+
+    df = pd.DataFrame(np.array(results), index=index, columns=columns)
+    df.to_csv(args.out, float_format='%.1f')
+
