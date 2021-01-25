@@ -7,7 +7,7 @@ from .atomtype import *
 
 def residue_mapper():
 
-    filename = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data/non-standard_residues")
+    filename = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../data/non-standard_residues.dat")
     df = pd.read_csv(filename, header=0, sep="\t")
     mapper = {}
     for i in range(df.shape[0]):
@@ -90,14 +90,17 @@ class ProteinParser(object):
         Mdtraj atom selection language: http://mdtraj.org/development/atom_selection.html
         Returns
         -------
-        """
-        top = self.pdb.topology
+        """ 
 
         mapper = residue_mapper()
 
         # obtain the atom indices of the protein (only protein atoms are selected,
         # water and ions are discarded in this step)
+        top = self.pdb.topology
         self.receptor_indices = top.select(rec_sele)
+        self.pdb.atom_slice(self.receptor_indices, inplace=True)
+        top = self.pdb.topology
+
         # get a dataframe containing the atom information.
         _table, _bond = top.to_dataframe()
 
@@ -110,6 +113,6 @@ class ProteinParser(object):
 
         self.residue_names = [ "{}_{}_{}".format(self._residue_standard(_table['resName'].values[i], mapper), 
                                _table['resSeq'].values[i], _table['chainID'].values[i]) 
-                               for i in range(_table,shape[0])]
+                               for i in range(_table.shape[0])]
 
         return self
