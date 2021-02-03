@@ -100,12 +100,13 @@ class ProteinParser(object):
         self.receptor_indices = top.select(rec_sele)
         self.pdb.atom_slice(self.receptor_indices, inplace=True)
         top = self.pdb.topology
+        self.receptor_indices = top.select(rec_sele)
 
         # get a dataframe containing the atom information.
         _table, _bond = top.to_dataframe()
-
+        #print(_table.head(), self.receptor_indices)
         # fetch the element type of each one of the protein atom
-        self.rec_ele = _table['element'][self.receptor_indices].values
+        self.rec_ele = _table['element'].values[self.receptor_indices] #.values
         # fetch the coordinates of each one of the protein atom
         self.get_coordinates()
 
