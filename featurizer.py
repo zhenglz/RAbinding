@@ -1,5 +1,6 @@
 #!/usr/bin/ python 3.X
 
+import time
 import numpy as np
 import pandas as pd
 from argparse import RawDescriptionHelpFormatter
@@ -12,6 +13,7 @@ from utils.receptor import ProteinParser
 from utils.ligand import LigandParser
 from utils.distances import residue_min_distance
 from utils.contacts import dist2count_simple
+from utils.parallel import ParallelSim
 
 
 # all residue-atom combination pairs
@@ -80,12 +82,13 @@ def generate_features(receptor_file, ligand_file, cutoffs):
     
     #print("Number of keys in results ", len(final_results.keys()))
 
-    return list(final_results.values())
+    return list(final_results.values()), receptor_file, ligand_file
 
 
 if __name__ == "__main__":
 
     print("Start Now ... ")
+    start_time = time.time()
 
     d = """
         Generate the residue-atom contact features.
@@ -109,25 +112,40 @@ if __name__ == "__main__":
     parser.add_argument("-shells", type=int, default=62,
                         help="Input. The total number of shells. The optional range here \n"
                              "is 10 <= N <= 90.")
+    parser.add_argument("-cpu", type=int, default=12,
+                        help="Input (Optional). Number of CPUs for parallel computation.")                        
 
     args = parser.parse_args()
 
     with open(args.inp) as lines:
         inputs = [x.split()[:2] for x in lines if ("#" not in x and len(x))]
 
-    results = []
     index = []
-
     outermost = 0.5 * (args.shells + 1)
     ncutoffs = np.linspace(2.0, outermost, args.shells)
 
     l = len(inputs)
-    for i, fns in enumerate(inputs):
-        rec, lig = fns
-        print(rec, lig)
-        result = generate_features(rec, lig, ncutoffs)
-        results.append(list(np.array(result).ravel()))
-        index.append(rec+"_"+lig)
+    if args.cpu <= 1:
+        results = []
+        for i, fns in enumerate(inputs):
+            rec, lig = fns
+            print(rec, lig)
+            result, _r, _l = generate_features(rec, lig, ncutoffs)
+            results.append(list(np.array(result).ravel()))
+            index.append(_r+ "_"+ _l)
+            print("INFO: data shape = {} | index {} | total {}".format(np.array(results).shape, i, l))
+    else:
+        paral = ParallelSim(args.cpu)
+        #arguments = []
+        results = []
+        for i, fns in enumerate(inputs):
+            rec, lig = fns
+            _args = [rec, lig, ncutoffs]
+            paral.add(generate_features, _args)
+        paral.run()
+        all_results = paral.get_results()
+        results = [x[0] for x in all_results]
+        index = [x[1] + "_" + x[2] for x in all_results]
         print("INFO: data shape = {} | index {} | total {}".format(np.array(results).shape, i, l))
 
     columns = []
@@ -137,3 +155,5 @@ if __name__ == "__main__":
     df = pd.DataFrame(np.array(results), index=index, columns=columns)
     df.to_csv(args.out, float_format='%.1f')
 
+    end_time = time.time()
+    print("Total computation time: %.3f seconds" % (end_time - start_time))
