@@ -1,5 +1,8 @@
 
 import numpy as np
+import mdtraj as mt
+import itertools
+
 
 def fast_distance_pairs(coords_pro, coords_lig):
     return np.array([np.linalg.norm(coord_pro - coords_lig, axis=-1) for coord_pro in coords_pro]).ravel()
@@ -36,24 +39,28 @@ def residue_min_distance(coord_pro, coord_lig, residue_names, receptor_elements,
     for _residue in residue_names:
         if _residue not in uniq_res:
             uniq_res.append(_residue)
+    
+    print(coord_pro.shape, len(residue_names))
 
-    assert coord_pro.shape[0] == len(residue_names)
+    #assert coord_pro.shape[0] == len(residue_names)
     assert coord_pro.shape[0] == len(receptor_elements)
     assert coord_lig.shape[0] == len(ligand_elements)
 
-    _ligand_indices = np.array2string([x for x in range(len(ligand_elements)) if ligand_elements[i] != "H"])
+    _ligand_indices = np.array([x for x in range(len(ligand_elements)) if ligand_elements[x] != "H"])
 
-    results = np.zeros((len(uniq_res), len(_ligand_indices.shape[0])))
+    results = np.zeros((len(uniq_res), _ligand_indices.shape[0]))
 
     for i, resid in enumerate(uniq_res):
-        _receptor_indices = np.array([x for x in range(len(residue_names)) 
-                                      if (residue_names[x] == uniq_res] and 
-                                          ligand_elements[x] != "H"))
+        _receptor_indices = np.array([x for x in range(coord_pro.shape[0]) 
+                                      if (residue_names[x] == resid and 
+                                          receptor_elements[x] != "H")])
+        #print(_receptor_indices, _ligand_indices)
         
         _distances = fast_distance_pairs(coord_pro[_receptor_indices], coord_lig[_ligand_indices])
         _distances = _distances.reshape((-1, _ligand_indices.shape[0]))
         
         _min_dist = np.mean(_distances, axis=0)
+        #print(_min_dist)
         results[i] = _min_dist
     
     return (results, uniq_res, [x for x in ligand_elements if x != "H"])

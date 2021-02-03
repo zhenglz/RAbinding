@@ -79,7 +79,7 @@ class LigandParser(object):
         top = self.lig.topology
         table, bond = top.to_dataframe()
         # get the element-type of all atoms
-        self.lig_ele = [x if x in elements_ligand else "DU" for x in list(table['element'])]
+        self.lig_ele = [x if x in all_elements else "DU" for x in list(table['element'])]
 
         # mdtraj use nanometer as coordinates unit.
         # nano-meter to angstrom
