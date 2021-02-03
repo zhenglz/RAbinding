@@ -29,16 +29,16 @@ def generate_features(receptor_file, ligand_file, cutoffs):
 
     # get receptor information
     _residue_names = receptor.residue_names
-    print(_residue_names)
+    #print(_residue_names)
     _residue_elements = receptor.rec_ele
     _residue_coordinates = receptor.coordinates_
-    print("RECEPTOR COORD", _residue_coordinates.shape)
+    #print("RECEPTOR COORD", _residue_coordinates.shape)
 
     # get ligand information
     _ligand_elements = ligand.lig_ele
-    print(_ligand_elements)
+    #print(_ligand_elements)
     _ligand_coordinates = ligand.coordinates_
-    print("LIGAND COORD", _ligand_coordinates.shape)
+    #print("LIGAND COORD", _ligand_coordinates.shape)
 
     # get mini distances
     _min_distances, _residues, _non_hydrogen_elements = residue_min_distance(_residue_coordinates, _ligand_coordinates, 
@@ -51,8 +51,8 @@ def generate_features(receptor_file, ligand_file, cutoffs):
 
     # residue-atom pairs
     residues_lig_atoms_combines = ["_".join(x) for x in list(itertools.product(all_residues, all_elements))]
-    print("LENGTH RESIDUE COMBINES ", len(residues_lig_atoms_combines), len(set(residues_lig_atoms_combines)))
-    print(residues_lig_atoms_combines)
+    #print("LENGTH RESIDUE COMBINES ", len(residues_lig_atoms_combines), len(set(residues_lig_atoms_combines)))
+    #print(residues_lig_atoms_combines)
 
     # calculate the number of contacts in different shells
     counts = []
@@ -62,7 +62,7 @@ def generate_features(receptor_file, ligand_file, cutoffs):
     for i, cutoff in enumerate(cutoffs):
         counts_ = dist2count_simple(_min_distances, cutoff)#.ravel()
         counts.append(counts_.ravel())
-        print(len(onion_counts), counts_.shape, )
+        #print(len(onion_counts), counts_.shape, )
         if i == 0:
             onion_counts.append(list(counts_.ravel()))
         else:
@@ -78,7 +78,7 @@ def generate_features(receptor_file, ligand_file, cutoffs):
                 _new_key = new_residue[j] + "_" + new_lig[k] + "_" + str(i)
                 final_results[_new_key] += counts_[j, k]
     
-    print("Number of keys in results ", len(final_results.keys()))
+    #print("Number of keys in results ", len(final_results.keys()))
 
     return list(final_results.values())
 
@@ -128,7 +128,7 @@ if __name__ == "__main__":
         result = generate_features(rec, lig, ncutoffs)
         results.append(list(np.array(result).ravel()))
         index.append(rec+"_"+lig)
-        print(np.array(results).shape, i, l)
+        print("INFO: data shape = {} | index {} | total {}".format(np.array(results).shape, i, l))
 
     columns = []
     for i, n in enumerate(keys * len(ncutoffs)):

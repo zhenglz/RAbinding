@@ -1,3 +1,5 @@
+import os
+import subprocess as sp
 
 elements_ligand = ["H", "C", "O", "N", "P", "S", "Hal", "DU"]
 elements_protein = ["H", "C", "O", "N", "P", "S", "Hal", "DU"]
@@ -74,6 +76,11 @@ class Molecule(object):
         -------
         self : return an instance of itself
         """
+        try:
+            from rdkit import Chem
+        except:
+            print("INFO: rdkit is not imported")
+
         self.converter_ = {
             "pdb": Chem.MolFromPDBFile,
             "mol2": Chem.MolFromMol2File,

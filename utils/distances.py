@@ -40,7 +40,7 @@ def residue_min_distance(coord_pro, coord_lig, residue_names, receptor_elements,
         if _residue not in uniq_res:
             uniq_res.append(_residue)
     
-    print(coord_pro.shape, len(residue_names))
+    #print(coord_pro.shape, len(residue_names))
 
     #assert coord_pro.shape[0] == len(residue_names)
     assert coord_pro.shape[0] == len(receptor_elements)
