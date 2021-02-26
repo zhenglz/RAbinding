@@ -4,6 +4,7 @@ import numpy as np
 from argparse import RawDescriptionHelpFormatter
 import argparse
 from sklearn import preprocessing
+from scipy import stats
 #from sklearn.externals import joblib
 import os
 
@@ -82,8 +83,9 @@ def create_model(input_size, lr=0.001, use_pool=False):
     model.add(tf.keras.layers.Dense(1, kernel_regularizer=tf.keras.regularizers.l2(0.01), ))
     model.add(tf.keras.layers.Activation("relu"))
 
-    sgd = tf.keras.optimizers.SGD(lr=lr, momentum=0.9, decay=1e-6, clipvalue=args.clipvalue)
-    model.compile(optimizer=sgd, loss=PCC_RMSE, metrics=["mse", PCC, RMSE, PCC_RMSE])
+    #sgd = tf.keras.optimizers.SGD(lr=lr, momentum=0.9, decay=1e-6, clipvalue=args.clipvalue)
+    adam = tf.keras.optimizers.Adam(lr=lr) #, momentum=0.9, decay=1e-6, clipvalue=args.clipvalue)
+    model.compile(optimizer=adam, loss=PCC_RMSE, metrics=["mse", PCC, RMSE, PCC_RMSE])
     
     return model
 
@@ -106,7 +108,7 @@ if __name__ == "__main__":
     parser.add_argument("-validate", type=str, default="valid_features_pKa.csv",
                         help="Input. This input file shuould include the features and pKa \n"
                              "of complexes in the validating set.")
-    parser.add_argument("-test", type=str, default="test_features_pKa.csv",
+    parser.add_argument("-test", type=str, nargs="+", default=["test_features_pKa.csv", ],
                         help="Input. This input file shuould include the features and pKa \n"
                              "of complexes in the validating set.")
     parser.add_argument("-labels", type=str, default="INDEX_file.")
@@ -144,12 +146,9 @@ if __name__ == "__main__":
     print("Training set loaded ...")
     valid = pd.read_csv(args.validate, index_col=0)
     print("Validating set loaded ...")
-    #test = pd.read_csv(args.test, index_col=0)
-    #print("Test set loaded ...")
 
     X_train = train.values[:, :args.n_features]
     X_valid = valid.values[:, :args.n_features]
-    #X_test = test.values[:, :args.n_features]
 
     # Standardize the features
     scaler = preprocessing.StandardScaler()
@@ -176,3 +175,19 @@ if __name__ == "__main__":
                         batch_size = args.batchsz,
                         verbose=1,
                         callbacks=[stop, logger, bestmodel])
+    
+    # test data predict
+    for filename in args.test:
+        if os.path.exists(filename):
+            test = pd.read_csv(filename, index_col=0)
+            print("Test set {} loaded ...".format(filename))
+
+            X_test = test.values[:, :args.n_features]
+            X_test_std = scaler.transform(X_test).reshape([-1] + args.shape)
+            y_test = np.array([labels[x.split("/")[-1].split("_")[0]] for x in test.index.values]) #.reshape((-1, 1))
+
+            y_pred = np.array(model.predict(X_test_std)).reval()
+
+            _r = stats.pearsonr(y_test, y_pred)[0]
+            _rmse = np.sqrt(np.mean(np.square(y_pred - y_test)))
+            print("Test performance %s \nR    = %.5f \nRMSE = %.5f" % (filename, _r, _rmse)) 
