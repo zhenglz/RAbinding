@@ -4,8 +4,20 @@ import numpy as np
 from argparse import RawDescriptionHelpFormatter
 import argparse
 from sklearn import preprocessing
-from sklearn.externals import joblib
+#from sklearn.externals import joblib
 import os
+
+
+def load_label(filename):
+    labels = {}
+    with open(filename) as lines:
+        lines = [x for x in lines if len(x.split()) and "#" != x[0]]
+        
+        for l in lines:
+            labels[l.split()[0]] = float(l.split()[3])
+
+    return labels
+
 
 def PCC_RMSE(y_true, y_pred):
     alpha = args.alpha
@@ -38,16 +50,22 @@ def PCC(y_true, y_pred):
     return pcc
 
 # CNN Architecture
-def create_model(input_size, lr=0.001):
+def create_model(input_size, lr=0.001, use_pool=False):
     model = tf.keras.Sequential()
     model.add(tf.keras.layers.Conv2D(32, 4, 1, input_shape=input_size))
     model.add(tf.keras.layers.Activation("relu"))
+    if use_pool:
+        model.add(tf.keras.layers.MaxPool2D((3, 3), padding='valid', strides=1))
 
     model.add(tf.keras.layers.Conv2D(64, 4, 1))
     model.add(tf.keras.layers.Activation("relu"))
+    if use_pool:
+        model.add(tf.keras.layers.MaxPool2D((3, 3), padding='valid', strides=1))
     
     model.add(tf.keras.layers.Conv2D(128, 4, 1))
     model.add(tf.keras.layers.Activation("relu"))
+    if use_pool:
+        model.add(tf.keras.layers.MaxPool2D((3, 3), padding='valid', strides=1))
 
     model.add(tf.keras.layers.Flatten())
 
@@ -82,12 +100,16 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description=d, formatter_class=RawDescriptionHelpFormatter)   
 
-    parser.add_argument("-train_file", type=str, default="train_features_pKa.csv",
+    parser.add_argument("-train", type=str, default="train_features_pKa.csv",
                         help="Input. This input file should include the features and pKa \n"
                              "of complexes in the training set.")
-    parser.add_argument("-valid_file", type=str, default="valid_features_pKa.csv",
+    parser.add_argument("-validate", type=str, default="valid_features_pKa.csv",
                         help="Input. This input file shuould include the features and pKa \n"
                              "of complexes in the validating set.")
+    parser.add_argument("-test", type=str, default="test_features_pKa.csv",
+                        help="Input. This input file shuould include the features and pKa \n"
+                             "of complexes in the validating set.")
+    parser.add_argument("-labels", type=str, default="INDEX_file.")
     parser.add_argument("-shape", type=int, default=[84, 124, 1], nargs="+",
                         help="Input. Reshape the features.")
     parser.add_argument("-lr", type=float, default=0.001,
@@ -112,16 +134,22 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
 
-    model = create_model(args.shape, args.lr)
+    labels = load_label(args.labels)
+
+    model = create_model(args.shape, args.lr, use_pool=True)
+    print(model.summary())
 
     # load data
-    train = pd.read_csv(args.train_file, index_col=0)
+    train = pd.read_csv(args.train, index_col=0)
     print("Training set loaded ...")
-    valid = pd.read_csv(args.valid_file, index_col=0)
+    valid = pd.read_csv(args.validate, index_col=0)
     print("Validating set loaded ...")
+    #test = pd.read_csv(args.test, index_col=0)
+    #print("Test set loaded ...")
 
     X_train = train.values[:, :args.n_features]
     X_valid = valid.values[:, :args.n_features]
+    #X_test = test.values[:, :args.n_features]
 
     # Standardize the features
     scaler = preprocessing.StandardScaler()
@@ -129,15 +157,16 @@ if __name__ == "__main__":
     X_train_std = scaler.fit_transform(X_train).reshape([-1] + args.shape)
     X_valid_std = scaler.transform(X_valid).reshape([-1] + args.shape)
 
-    joblib.dump(scaler, 'train_scaler.scaler')
+    #joblib.dump(scaler, 'train_scaler.scaler')
 
     # labels
-    y_train = train.pKa.values
-    y_valid = valid.pKa.values
-
+    y_train = np.array([labels[x.split("/")[-1].split("_")[0]] for x in train.index.values]).reshape((-1, 1))
+    #y_valid = valid.pKa.values
+    y_valid = np.array([labels[x.split("/")[-1].split("_")[0]] for x in valid.index.values]).reshape((-1, 1))
+    print("example labels ", y_train[:10].ravel())
     # Callback
     stop = tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=0.001, patience=args.patience,
-                                            verbose=1, mode='auto', )
+                                            verbose=0, mode='auto', )
     logger = tf.keras.callbacks.CSVLogger("logfile", separator=',', append=False)
     bestmodel = tf.keras.callbacks.ModelCheckpoint(filepath=args.out, verbose=1, save_best_only=True)
         

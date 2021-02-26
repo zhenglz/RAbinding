@@ -106,6 +106,7 @@ def get_residue(residue):
 # Define all element types
 all_elements = ['H', 'C',  'O', 'N', 'P', 'S', 'Hal', 'DU']
 Hal = ['F', 'Cl', 'Br', 'I']
+
 def get_elementtype(e):
 
     if e in all_elements:
